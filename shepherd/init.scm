@@ -46,63 +46,16 @@
 
 (define %home (getenv "HOME"))
 
-(define (rbenv-bin version)
-  "Return the binary path for the VERSION of Ruby managed by rbenv."
-  (string-append %home "/.rbenv/versions/" version "/bin"))
-
-(define (ruby-environment version gemset)
-  "Return the environment variables needed to run Ruby applications
-that use a specific VERSION of Ruby, whose dependencies are stored in
-GEMSET."
-  (let ((gem-home (string-append %home "/.gems/" gemset)))
-    (list (string-append "GEM_PATH=" gem-home)
-          (string-append "GEM_HOME=" gem-home)
-          (string-append "PATH=" gem-home "/bin:"
-                         (rbenv-bin version) ":"
-                         (getenv "PATH")))))
-
-(define* (rails-service name port ruby-version #:optional (requires '()))
-  "Create a service that runs the Rails application NAME located in
-DIR.  The application runs with RUBY, the file name of the necessary
-Ruby version, and listens on PORT."
-  (define gem-home
-    (string-append %home "/.gems/" name))
-
-  (make <service>
-    #:provides (list (string->symbol name))
-    #:requires requires
-    #:start (make-forkexec-constructor
-             `("passenger" "start"
-               "--address" "127.0.0.1"
-               "--port" ,port
-               "--ruby" ,(string-append (rbenv-bin ruby-version) "/ruby"))
-             #:directory (string-append %home "/Code/" name)
-             #:environment-variables (ruby-environment ruby-version name))
-    #:stop (make-kill-destructor)))
-
-;; (define-service vhl-tunnel
-;;   (make <service>
-;;     #:provides '(vhl-tunnel)
-;;     #:requires '()
-;;     #:start (make-forkexec-constructor
-;;              '("ssh" "-N" "-L" "1234:7VWJD42.vhl.dom:22" "vhl"))
-;;     #:stop (make-kill-destructor)))
-
-;; (define-service vhl-proxy
-;;   (make <service>
-;;     #:provides '(vhl-proxy)
-;;     #:requires '(vhl-tunnel)
-;;     #:start (make-forkexec-constructor
-;;              '("ssh" "-N" "-D8080" "-p1234" "dthompson@localhost"))
-;;     #:stop (make-kill-destructor)))
-
 (register-services
  ;; Emacs
  (make <service>
    #:provides '(emacs)
    #:requires '()
    #:start (make-system-constructor '("emacs" "--daemon"))
-   #:stop (make-system-destructor '("emacsclient" "--eval" "(kill-emacs)"))))
+   #:stop (make-system-destructor '("emacsclient" "--eval" "(kill-emacs)")))
+
+ ;; Compton X11 Compositor
+ (simple-service "compton"))
 
 ;; Send shepherd into the background.
 (action 'shepherd 'daemonize)
@@ -113,4 +66,4 @@ Ruby version, and listens on PORT."
 ;; Services to start when shepherd starts:
 ;; Add the name of each service that should be started to the list
 ;; below passed to 'for-each'.
-(for-each start '(emacs))
+(for-each start '(emacs compton))
